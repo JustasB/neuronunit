@@ -152,3 +152,17 @@ class ReceivesCurrent(ReceivesSquareCurrent):
         This is a time series of the current to be injected.
         """
         raise NotImplementedError()
+
+
+class SupportsVoltageClamp(sciunit.Capability):
+    """Indicate that the model can be held at three levels of voltages using a voltage clamp"""
+
+    def clamp_voltage(self, voltages=[0*pq.mV]*3, durations=[0*pq.ms]*3):
+        '''
+        Maintains the model membrane potential for the specified durations at the specified voltages
+
+        :param voltages: a 3-element array of voltages to clamp to
+        :param durations: a 3-element array of durations to maintain the corresponding voltage levels
+        :return: neo.core.AnalogSignal of the current required to keep the model at the specified voltages
+        '''
+        raise NotImplementedError()

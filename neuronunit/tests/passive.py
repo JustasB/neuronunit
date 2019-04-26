@@ -242,6 +242,7 @@ class RestingPotentialTest(TestPulseTest):
 
     def generate_prediction(self, model):
         """Implement sciunit.Test.generate_prediction."""
+
         result = super(RestingPotentialTest, self).generate_prediction(model)
         if result is not None:
             median = model.get_median_vm()  # Use median for robustness.
@@ -255,6 +256,7 @@ class RestingPotentialTest(TestPulseTest):
 
     def compute_score(self, observation, prediction):
         """Implement sciunit.Test.score_prediction."""
+
         if prediction is None:
             return None  # scores.InsufficientDataScore(None)
         else:
