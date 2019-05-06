@@ -569,6 +569,3 @@ class SpikeAccommodationTimeConstantTest(SpikeTrainTest):
 
 
 
-
-class AfterDepolarizationPotentialAmplitudeTest(OlfactoryBulbCellSpikeTest):
-
