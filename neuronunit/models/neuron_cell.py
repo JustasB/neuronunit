@@ -5,10 +5,12 @@ import neuronunit
 import numpy as np
 
 class NeuronCellModel(sciunit.Model,
+                      sciunit.capabilities.Runnable,
                       neuronunit.capabilities.ProducesMembranePotential,
                       neuronunit.capabilities.ReceivesSquareCurrent,
                       neuronunit.capabilities.SupportsVoltageClamp,
-                      sciunit.capabilities.Runnable):
+                      neuronunit.capabilities.ProducesSpikes,
+                      neuronunit.capabilities.SupportsSettingTemperature):
     '''
     Defines a NeuronUnit model for running NeuronUnit tests against a
     cell model (1+ sections) implemented in NEURON simulator.
@@ -67,7 +69,10 @@ class NeuronCellModel(sciunit.Model,
         return self
 
     def set_stop_time(self, tstop):
-        self.h.tstop = tstop
+        self.h.tstop = tstop.rescale(pq.ms).magnitude
+
+    def set_temperature(self, celsius):
+        self.h.celsius = celsius
 
     def inject_square_current(self, current = {"delay":0*pq.ms, "duration": 0*pq.ms, "amplitude": 0*pq.nA}):
         # Set the units that NEURON uses
@@ -79,7 +84,6 @@ class NeuronCellModel(sciunit.Model,
         self.injector.dur = float(current["duration"])
         self.injector.amp = float(current["amplitude"])
 
-        self.h.tstop = self.injector.dur + self.injector.delay
         self.h.run()
         self.reset_clamps()
 
@@ -89,7 +93,6 @@ class NeuronCellModel(sciunit.Model,
         self.vclamp.amp1, self.vclamp.amp2, self.vclamp.amp3 = [float(v) for v in voltages]
         self.vclamp.dur1, self.vclamp.dur2, self.vclamp.dur3 = [float(d) for d in durations]
 
-        self.h.tstop = self.vclamp.dur1 + self.vclamp.dur2 + self.vclamp.dur3
         self.h.run()
         self.reset_clamps()
 
