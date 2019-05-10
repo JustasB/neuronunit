@@ -35,6 +35,11 @@ class BurtonUrban2014(BasePublication):
     rebound_ap_method = "sag"
     spike_train_target_freq = 20*pq.Hz
 
+class BurtonUrban2015(BurtonUrban2014):
+    ''' Burton & Urban (2015) Rapid Feedforward Inhibition and Asynchronous Excitation Regulate Granule Cell Activity in the Mammalian Main Olfactory Bulb'''
+    temperature = 32
+
+
 class Yu2015(BasePublication):
     ''' Yu et. al. (2015) Postnatal development attunes olfactory bulb mitral cells to high-frequency signaling '''
 

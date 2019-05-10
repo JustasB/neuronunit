@@ -59,6 +59,9 @@ class ReboundSpikingTestJohnsonDelaney2010(JohnsonDelaney2010,  ReboundSpikingTe
 class FISlopeTestBurtonUrban2014(BurtonUrban2014, FISlopeTest):
     pass
 
+class FISlopeTestBurtonUrban2015(BurtonUrban2015, FISlopeTest):
+    pass
+
 class ISICVTestBurtonUrban2014(BurtonUrban2014, ISICVTest):
     pass
 
