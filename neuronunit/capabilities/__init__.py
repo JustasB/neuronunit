@@ -65,7 +65,7 @@ class ProducesMembranePotential(sciunit.Capability):
 class ProducesSpikes(sciunit.Capability):
     """Indicate that the model produces spikes.
 
-    No duration is required for these spikes.
+    No AP duration is required for these spikes.
     """
 
     def get_spike_train(self):

@@ -3,13 +3,15 @@ import quantities as pq
 from neo import AnalogSignal
 import neuronunit
 import numpy as np
+from neuronunit.tests.olfactory_bulb.utilities import get_zero_crossings_neg2pos
 
 class NeuronCellModel(sciunit.Model,
                       sciunit.capabilities.Runnable,
-                      neuronunit.capabilities.ProducesMembranePotential,
                       neuronunit.capabilities.ReceivesSquareCurrent,
+                      neuronunit.capabilities.ProducesMembranePotential,
                       neuronunit.capabilities.SupportsVoltageClamp,
                       neuronunit.capabilities.ProducesSpikes,
+                      neuronunit.capabilities.SupportsSettingStopTime,
                       neuronunit.capabilities.SupportsSettingTemperature):
     '''
     Defines a NeuronUnit model for running NeuronUnit tests against a
@@ -39,7 +41,7 @@ class NeuronCellModel(sciunit.Model,
     test.judge(model)
     '''
 
-    sampling_period = 0.25 # ms
+    sampling_period = 0.125 # ms
 
     def __init__(self, in_seg, out_seg=None, name=None):
         super(NeuronCellModel, self).__init__()
@@ -65,6 +67,8 @@ class NeuronCellModel(sciunit.Model,
         self.tVector.record(self.h._ref_t, self.sampling_period)
         self.vciVector.record(self.vclamp._ref_i, self.sampling_period)
 
+        self.h.steps_per_ms = round(1.0 / self.sampling_period)
+
     def get_backend(self):
         return self
 
@@ -74,7 +78,7 @@ class NeuronCellModel(sciunit.Model,
     def set_temperature(self, celsius):
         self.h.celsius = celsius
 
-    def inject_square_current(self, current = {"delay":0*pq.ms, "duration": 0*pq.ms, "amplitude": 0*pq.nA}):
+    def inject_square_current(self, current = {"delay":0*pq.ms, "duration": 0*pq.ms, "amplitude": 0*pq.nA}, stop_on_spike=False):
         # Set the units that NEURON uses
         current["delay"].units = pq.ms
         current["duration"].units = pq.ms
@@ -84,9 +88,35 @@ class NeuronCellModel(sciunit.Model,
         self.injector.dur = float(current["duration"])
         self.injector.amp = float(current["amplitude"])
 
-        self.h.run()
-        self.reset_clamps()
+        if not stop_on_spike:
+            self.h.run()
+        else:
 
+            # import pydevd
+            # pydevd.settrace('192.168.0.100', port=4200)
+
+            self.h.stdinit()
+            final_stop = self.h.tstop
+            step = 10
+            while self.h.t < final_stop - 0.001:
+                if self.h.t >= self.injector.delay - 0.001:
+                    next_stop = min(self.h.t + step, final_stop)
+                else:
+                    next_stop = self.injector.delay
+
+                self.h.runStopAt = next_stop
+                self.h.continuerun(next_stop)
+                self.h.stoprun = 1
+
+                voltage = self.get_membrane_potential()
+                aps = get_zero_crossings_neg2pos(voltage, current["delay"])
+
+                if len(aps) > 0:
+                    self.reset_clamps()
+                    return voltage
+
+
+        self.reset_clamps()
         return self.get_membrane_potential()
 
     def clamp_voltage(self, voltages=[0*pq.mV, 0*pq.mV, 0*pq.mV], durations=[0]*3*pq.ms):
@@ -133,3 +163,16 @@ class NeuronCellModel(sciunit.Model,
         self.vclamp.amp1, self.vclamp.amp2, self.vclamp.amp3 = [0,0,0]
         self.vclamp.dur1, self.vclamp.dur2, self.vclamp.dur3 = [0,0,0]
         self.vclamp.rs = 0.001  # MOhm
+
+    def __hash__(self):
+        hash_tuple = (
+            self.name,
+            self.h.dt if self.h.cvode_active() == 0 else 0,
+            self.sampling_period,
+            str(self.in_seg),
+            str(self.out_seg)
+        )
+
+        result = hash(hash_tuple)
+
+        return result

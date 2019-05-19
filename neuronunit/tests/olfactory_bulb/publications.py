@@ -3,7 +3,8 @@ import quantities as pq
 class BasePublication:
     '''
     A base class with common parameters. Subclasses of this class are used as mix-in classes to set the
-    parameters of generic tests
+    parameters of generic tests. E.g. A generic InputResistanceTest is combined with the publication Yu2015 by
+    creating a specific "class InputResistanceTestYu2015(Yu2015, InputResistanceTest)"
     '''
 
     ss_delay = 1000 * pq.ms             # Delay before stimulus
@@ -74,6 +75,25 @@ class Zibman2011(BasePublication):
 class Stroh2012(BasePublication):
     ''' Stroh et. al. (2012)	NMDA Receptor-Dependent Synaptic Activation of TRPC Channels in Olfactory Bulb Granule Cells '''
     temperature = 21
-    current_duration = 1.0 * pq.ms
+
+
+class Abraham2010(BasePublication):
+    temperature = 24.5
+
+
+class Hovis2010(BasePublication):
+    temperature = 35
+
+
+class Shpak2012(BasePublication):
+    temperature = 22
+
+
+class Christie2005(BasePublication):
+    temperature = 33.5
+
+
+class Fukunaga2012(BasePublication):
+    temperature = 36
 
 
