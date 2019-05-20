@@ -82,14 +82,22 @@ def get_APs(voltage, ss_delay, method):
     :param method: 'd3v/dt3' or 'dv/dt=20'
     :return:
     '''
+
+    ss_delay_point = int(ss_delay * voltage.sampling_rate)+1
+    end_point = voltage.size
+
     # Find where voltage crosses 0 neg->pos
     crossings = get_zero_crossings_neg2pos(voltage)
-    crossings = crossings[np.where(crossings > ss_delay * voltage.sampling_rate)]
+    crossings = crossings[np.where(crossings > ss_delay_point)]
 
-    # Chop the series, keeping prior few ms
-    pre_cross_window = voltage.sampling_rate * 5 * pq.ms
-    cuts = np.array((crossings - pre_cross_window), dtype=int)
-    ap_voltages = np.split(voltage, cuts)[1:]
+    points_of_interest = [ss_delay_point] + list(crossings) + [end_point]
+
+    # Chop the series so that AP voltages between crossings is considered
+    ap_voltages = []
+    for p in range(1, len(points_of_interest)-1):
+        start_chop = points_of_interest[p - 1]
+        end_chop =   points_of_interest[p + 1]
+        ap_voltages.append(voltage[start_chop:end_chop])
 
     aps = []
 
@@ -129,9 +137,14 @@ def extract_threshold_d3dt3(v):
     # Zero-out very small fluctuations
     v3[np.where(np.abs(v3) < 1)] = 0
 
-    # Get the first peak of v'''
+    # Get the first peak of v''' before v crosses from neg to pos
     try:
-        i_thresh = np.argmax(v3[0:get_zero_crossings_neg2pos(v3)[0] + 1])
+        last_v_neg2pos = get_zero_crossings_neg2pos(v)[-1]
+        v3_pos2negs = get_zero_crossings_pos2neg(v3)
+        last_v3pos2neg = v3_pos2negs[np.where(v3_pos2negs < last_v_neg2pos)][-1] + 1
+        last_v3_zero = np.where(v3[0:last_v3pos2neg] == 0)[0][-1]
+        first_peak = v3[last_v3_zero:last_v3pos2neg]
+        i_thresh = last_v3_zero + np.argmax(first_peak)
 
         ap = {"threshold_v": v[i_thresh], "threshold_t": v.times[i_thresh].rescale(pq.ms)}
 

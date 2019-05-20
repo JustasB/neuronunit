@@ -222,7 +222,7 @@ class RheobaseTest(OlfactoryBulbCellTest):
             model.set_stop_time(self.ss_delay + self.current_duration)
 
             voltage = model.inject_square_current({"delay":     self.ss_delay,
-                                                   "duration":  self.current_duration - 10*pq.ms, # Leave a small margin, to avoid cutting off APs at the very end of the current step
+                                                   "duration":  self.current_duration,
                                                    "amplitude": trial_current},
                                                   stop_on_spike=True)
 
@@ -281,7 +281,9 @@ class RheobaseResponseTestHelper(OlfactoryBulbCellSpikeTest):
         rheobase = self.get_dependent_prediction(RheobaseTest, model)
 
         model.set_temperature(self.temperature)
-        model.set_stop_time(self.ss_delay + self.current_duration)
+
+        # Include a cool-off period to ensure any APs complete
+        model.set_stop_time(self.ss_delay + self.current_duration + 100*pq.ms)
 
         # Inject rheobase
         voltage = model.inject_square_current({"delay": self.ss_delay,
@@ -326,7 +328,7 @@ class FirstSpikeTestHelper(OlfactoryBulbCellSpikeTest):
                 plt.show()
 
         if len(aps) < 1:
-            raise Exception("The voltage trace does not contain any detectable action potentials")
+            raise Exception("The voltage trace does not contain any detectable action potentials using method: " + self.threshold_method)
 
         return aps[0]
 
@@ -420,16 +422,16 @@ class SagVoltageTest(OlfactoryBulbCellTest):
         v_roi = voltage.base[t_roi]
 
         if plot:
-            plt.plot(times[t_roi], v_roi)
+            plt.plot(voltage.times, voltage)
 
         v_injection_ss = v_roi[-1]
         v_min_index = np.argmin(v_roi)
         v_min = v_roi[v_min_index]
 
         if plot:
-            plt.plot([times[t_roi][-1]], [v_injection_ss], 'o', label="Current SS: "+str(v_injection_ss))
-            plt.plot([times[t_roi][v_min_index]], [v_min], 'o', label="Min: "+str(v_min))
-            plt.ylim((v_roi.min().magnitude, v_roi.max().magnitude))
+            plt.plot([times[t_roi][-1]], [v_injection_ss], 'o', label="Current SS: " + str(v_injection_ss))
+            plt.plot([times[t_roi][v_min_index]], [v_min], 'o', label="Min: " + str(v_min))
+            plt.ylim((v_roi.min().magnitude - 5, v_roi.max().magnitude + 5))
 
         if v_min < v_injection_ss:
             sag = v_injection_ss - v_min
@@ -497,7 +499,7 @@ class ReboundSpikingTest(OlfactoryBulbCellSpikeTest):
 
         if plot:
             plt.plot(voltage.times, voltage)
-            plt.title(str(self) + " rebound APs: " + str(len(crossings)))
+            plt.title(str(self) + " rebound APs: " + str(len(crossings)) + " at: " + str(inhibitory_current))
             plt.show()
 
         return len(crossings) > 0
@@ -644,7 +646,7 @@ class FISlopeTest(OlfactoryBulbCellSpikeTest):
         fi_gain = np.max(np.diff(frequencies))
         slope = fi_gain / 50 * 1000 * pq.Hz / pq.nA # 50 is the step size
 
-        if debug:
+        if plot:
             plt.plot(currents, frequencies, 'o')
             plt.title(str(self) + " " + str(slope))
             plt.show()
@@ -742,7 +744,7 @@ class ISICVTest(SpikeTrainTest):
     def generate_prediction_nocache(self, model):
         freq_targetHz, crossings, voltage = self.get_dependent_prediction(TargetFreqTestHelper, model)
 
-        if freq_targetHz is None:
+        if freq_targetHz is None or len(crossings) < 2:
             return 0
 
         isis = np.diff(crossings / voltage.sampling_rate)
