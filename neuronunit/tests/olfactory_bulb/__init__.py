@@ -22,10 +22,9 @@ class OlfactoryBulbCellTest(VmTest):
             self.check_required_properties()
 
             # Perform the uncached test
-            with CodeTimer(str(self.__class__.__name__)):
-                import pydevd
-                pydevd.settrace('192.168.0.100', port=4200, suspend=False)
-                result = self.generate_prediction_nocache(model)
+            import pydevd
+            pydevd.settrace('192.168.0.100', port=4200, suspend=False)
+            result = self.generate_prediction_nocache(model)
 
             # Store result in cache
             self.store_in_cache(model, result)

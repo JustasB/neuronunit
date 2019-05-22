@@ -3,6 +3,7 @@ import quantities as pq
 import cPickle
 import sys, os
 import tempfile
+import scipy
 
 class TestCache():
     pickle_dir = None
@@ -124,7 +125,13 @@ def get_APs(voltage, ss_delay, method):
         ap["voltage"] = ap_voltages[i]
         ap["peak_v"] = np.max(ap["voltage"])
         ap["amplitude"] = ap["peak_v"] - ap["threshold_v"]
-        ap["half_width"] = len(np.where(ap["voltage"] > (ap["threshold_v"] + ap["amplitude"]/2.0))[0]) / ap["voltage"].sampling_rate
+
+        above_half_amp = ap["voltage"] > (ap["threshold_v"] + ap["amplitude"] / 2.0)
+        features = scipy.ndimage.label(above_half_amp)
+        first_contiguous = scipy.ndimage.find_objects(features[0])[0]
+        v_above_half_amp = ap["voltage"][first_contiguous[0]]
+
+        ap["half_width"] = (v_above_half_amp.t_stop - v_above_half_amp.t_start).rescale(pq.ms)
 
     return aps
 

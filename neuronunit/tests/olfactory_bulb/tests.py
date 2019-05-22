@@ -513,7 +513,8 @@ class AfterHyperpolarizationTest(FirstSpikeTestHelper):
 
     def compute_amplitude(self, ap):
         if self.ahp_amplitude_method == 'threshold2min':
-            i_min_v = np.argmin(ap["voltage"])
+            roi_v = ap["voltage"].magnitude[np.where(ap["voltage"].times < ap["threshold_t"] + 100 * pq.ms)]
+            i_min_v = np.argmin(roi_v)
 
         elif self.ahp_amplitude_method == 'threshold2minWithin10ms':
             within10ms = np.where(ap["voltage"].times < ap["threshold_t"] + 10*pq.ms)
@@ -544,7 +545,14 @@ class AfterHyperpolarizationAmplitudeTest(AfterHyperpolarizationTest):
             plt.plot([ap["voltage"].times[0], ap["voltage"].times[-1]], [ap["threshold_v"], ap["threshold_v"]])
             plt.plot([ap["voltage"].times[0], ap["voltage"].times[-1]], [ap["threshold_v"]-amp, ap["threshold_v"]-amp])
             plt.title(str(self) + " " + str(amp))
-            plt.xlim((ap["voltage"].times[0], ap["voltage"].times[0] + 30 * pq.ms))
+            plt.xlim((ap["voltage"].times[0], ap["voltage"].times[0] + 10 * pq.ms))
+            plt.show()
+
+            plt.plot(ap["voltage"].times, ap["voltage"])
+            plt.plot([ap["voltage"].times[0], ap["voltage"].times[-1]], [ap["threshold_v"], ap["threshold_v"]])
+            plt.plot([ap["voltage"].times[0], ap["voltage"].times[-1]], [ap["threshold_v"]-amp, ap["threshold_v"]-amp])
+            plt.title(str(self) + " " + str(amp))
+            plt.xlim((ap["voltage"].times[0], ap["voltage"].times[0] + 110 * pq.ms))
             plt.show()
 
         return amp
@@ -573,7 +581,8 @@ class AfterHyperpolarizationTimeTest(AfterHyperpolarizationTest):
         crossing_time = ap["voltage"].times[crossing]
 
         if self.ahp_time_method == 'threshold2min':
-            i_min_v = np.argmin(ap["voltage"])
+            roi_v = ap["voltage"].magnitude[np.where(ap["voltage"].times < ap["threshold_t"] + 100*pq.ms)]
+            i_min_v = np.argmin(roi_v)
             min_v_time = ap["voltage"].times[i_min_v]
             ahp_time = (min_v_time - crossing_time).rescale(pq.ms)
 
@@ -598,6 +607,14 @@ class AfterHyperpolarizationTimeTest(AfterHyperpolarizationTest):
             plt.axvline(x=crossing_time + ahp_time)
             plt.title(str(self) + " " + str(ahp_time) + " " + self.ahp_time_method)
             plt.xlim((ap["voltage"].times[0], ap["voltage"].times[0] + 10 * pq.ms))
+            plt.show()
+
+            plt.plot(ap["voltage"].times, ap["voltage"])
+            plt.plot([ap["voltage"].times[0], ap["voltage"].times[-1]], [ap["threshold_v"], ap["threshold_v"]])
+            plt.plot([crossing_time], [ap["threshold_v"]], 'o')
+            plt.axvline(x=crossing_time + ahp_time)
+            plt.title(str(self) + " " + str(ahp_time) + " " + self.ahp_time_method)
+            plt.xlim((ap["voltage"].times[0], ap["voltage"].times[0] + 110 * pq.ms))
             plt.show()
 
 
