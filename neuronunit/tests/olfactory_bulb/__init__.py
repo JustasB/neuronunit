@@ -13,6 +13,8 @@ class OlfactoryBulbCellTest(VmTest):
         pass
 
     def generate_prediction(self, model):
+        import pydevd
+        pydevd.settrace('192.168.0.100', port=4200, suspend=False)
 
         result = self.fetch_cached(model)
 
@@ -22,9 +24,12 @@ class OlfactoryBulbCellTest(VmTest):
             self.check_required_properties()
 
             # Perform the uncached test
-            import pydevd
-            pydevd.settrace('192.168.0.100', port=4200, suspend=False)
-            result = self.generate_prediction_nocache(model)
+            try:
+                result = self.generate_prediction_nocache(model)
+            except:
+                import traceback
+                result = traceback.format_exc()
+                print(result)
 
             # Store result in cache
             self.store_in_cache(model, result)

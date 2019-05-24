@@ -243,7 +243,11 @@ class RheobaseTest(OlfactoryBulbCellTest):
 
             # Initially test if APs are produced within the maximum bounds
             if iteration > 0:
-                trial_current = (upper_bound + lower_bound) / 2.0
+                # If fails to produce a spike at expected 0mV current, try it's double
+                if trial_current == nA_to_0mV and len(crossings) < 1:
+                    upper_bound = trial_current = nA_to_0mV * 2
+                else:
+                    trial_current = (upper_bound + lower_bound) / 2.0
             else:
                 trial_current = upper_bound
 
@@ -265,7 +269,17 @@ class RheobaseTest(OlfactoryBulbCellTest):
         if not spikes_found:
             raise Exception("Rheobase was not found between 0 and " + str(upper_bound))
 
-        upper_bound.units = self.units
+        # If no rounding error will result from unit conversion
+        if upper_bound == upper_bound.rescale(self.units):
+            upper_bound.units = self.units
+
+        # Otherwise correct the rounding error
+        else:
+            rescaled = upper_bound.rescale(self.units)
+            unit_ratio = round((upper_bound.units / self.units).simplified.magnitude)
+            rounding_error = upper_bound.magnitude * unit_ratio - rescaled.magnitude
+            corrected = rescaled + rounding_error * self.units
+            upper_bound = corrected
 
         return upper_bound
 
@@ -344,6 +358,10 @@ class SpikeThresholdTest(FirstSpikeTestHelper):
 
     def generate_prediction_nocache(self, model):
         ap = self.get_dependent_prediction(FirstSpikeTestHelper, model)
+
+        if type(ap) == str and "Exception" in ap:
+            return ap
+
         return ap["threshold_v"]
 
 
@@ -355,6 +373,10 @@ class SpikePeakTest(FirstSpikeTestHelper):
 
     def generate_prediction_nocache(self, model):
         ap = self.get_dependent_prediction(FirstSpikeTestHelper, model)
+
+        if type(ap) == str and "Exception" in ap:
+            return ap
+
         return ap["peak_v"]
 
 
@@ -366,6 +388,10 @@ class SpikeAmplitudeTest(FirstSpikeTestHelper):
 
     def generate_prediction_nocache(self, model):
         ap = self.get_dependent_prediction(FirstSpikeTestHelper, model)
+
+        if type(ap) == str and "Exception" in ap:
+            return ap
+
         return ap["amplitude"]
 
 
@@ -377,6 +403,9 @@ class SpikeHalfWidthTest(FirstSpikeTestHelper):
 
     def generate_prediction_nocache(self, model):
         ap = self.get_dependent_prediction(FirstSpikeTestHelper, model)
+
+        if type(ap) == str and "Exception" in ap:
+            return ap
 
         if plot:
             upper = np.where(ap["voltage"].magnitude > ap["threshold_v"] + 0.5 * ap["amplitude"])
