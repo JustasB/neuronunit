@@ -13,8 +13,8 @@ class OlfactoryBulbCellTest(VmTest):
         pass
 
     def generate_prediction(self, model):
-        import pydevd
-        pydevd.settrace('192.168.0.100', port=4200, suspend=False)
+        # import pydevd
+        # pydevd.settrace('192.168.0.100', port=4200, suspend=False)
 
         result = self.fetch_cached(model)
 
