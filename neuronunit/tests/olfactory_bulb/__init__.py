@@ -41,7 +41,7 @@ class OlfactoryBulbCellTest(VmTest):
             for prop in self.required_properties:
                 if not hasattr(self, prop):
                     raise Exception("Property '" + prop + "' not found. Make sure the property is declared either in the"
-                                                         "generic test class or in the publication class.")
+                                                         " generic test class or in the publication class.")
 
     def fetch_cached(self, model):
         return cache.get(self.get_hash(model))

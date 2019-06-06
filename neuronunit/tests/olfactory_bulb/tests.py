@@ -292,7 +292,10 @@ class RheobaseResponseTestHelper(OlfactoryBulbCellSpikeTest):
                              ncap.SupportsSettingStopTime,)
 
     def generate_prediction_nocache(self, model):
-        rheobase = self.get_dependent_prediction(RheobaseTest, model)
+        if hasattr(self, "rheobase"):
+            rheobase = self.rheobase
+        else:
+            rheobase = self.get_dependent_prediction(RheobaseTest, model)
 
         model.set_temperature(self.temperature)
 
@@ -311,6 +314,25 @@ class RheobaseResponseTestHelper(OlfactoryBulbCellSpikeTest):
 
         return voltage
 
+class RheobaseSpikesTestHelper(OlfactoryBulbCellSpikeTest):
+    units = pq.dimensionless
+    score_type = scores.ZScore
+
+    required_capabilities = (ncap.ReceivesSquareCurrent,
+                             ncap.ProducesMembranePotential,
+                             scap.Runnable,
+                             ncap.SupportsSettingTemperature,
+                             ncap.SupportsSettingStopTime,)
+
+    def generate_prediction_nocache(self, model):
+
+        # Get voltage at rheobase
+        voltage = self.get_dependent_prediction(RheobaseResponseTestHelper, model)
+
+        # Quickly check for APs without extracting other AP properties
+        crossings = get_zero_crossings_neg2pos(voltage, self.ss_delay)
+
+        return len(crossings)
 
 class FirstSpikeTestHelper(OlfactoryBulbCellSpikeTest):
     required_capabilities = (ncap.ReceivesSquareCurrent,
@@ -567,6 +589,9 @@ class AfterHyperpolarizationAmplitudeTest(AfterHyperpolarizationTest):
     def generate_prediction_nocache(self, model):
         ap = self.get_dependent_prediction(FirstSpikeTestHelper, model)
 
+        if type(ap) == str:
+            return 0 * pq.mV
+
         amp = self.compute_amplitude(ap)
 
         if plot:
@@ -603,6 +628,9 @@ class AfterHyperpolarizationTimeTest(AfterHyperpolarizationTest):
         # pydevd.settrace('192.168.0.100', port=4200)
 
         ap = self.get_dependent_prediction(FirstSpikeTestHelper, model)
+
+        if type(ap) == str:
+            return 0 * pq.ms
 
         # When the voltage droppes below the threshold voltage
         crossings = get_zero_crossings_pos2neg(ap["voltage"] - ap["threshold_v"])
@@ -788,9 +816,16 @@ class ISICVTest(SpikeTrainTest):
     ]
 
     def generate_prediction_nocache(self, model):
-        freq_targetHz, crossings, voltage = self.get_dependent_prediction(TargetFreqTestHelper, model)
+        if self.spike_train_method == "target_freq":
+            freq_targetHz, crossings, voltage = self.get_dependent_prediction(TargetFreqTestHelper, model)
 
-        if freq_targetHz is None or len(crossings) < 2:
+            if freq_targetHz is None:
+                return 0
+
+        elif self.spike_train_method == "constant_current":
+            crossings, voltage = self.get_dependent_prediction(SpikeAccommodationHelperConstantCurrentTest, model)
+
+        if len(crossings) < 2:
             return 0
 
         isis = np.diff(crossings / voltage.sampling_rate)
@@ -834,6 +869,14 @@ class SpikeAccommodationHelperConstantCurrentTest(SpikeTrainTest):
             plt.show()
 
         return crossings, voltage
+
+class SpikesAtConstantTrainCurrentTest(SpikeTrainTest):
+    units = pq.dimensionless
+    score_type = scores.ZScore
+
+    def generate_prediction_nocache(self, model):
+        crossings, _ = self.get_dependent_prediction(SpikeAccommodationHelperConstantCurrentTest, model)
+        return len(crossings)
 
 class SpikeAccommodationTest(SpikeTrainTest):
     units = pq.Hz
@@ -938,3 +981,40 @@ class SpikeAccommodationTimeConstantTest(SpikeTrainTest):
 
 
 
+
+
+class SpikesAtCurrentTest(OlfactoryBulbCellTest):
+    units = pq.dimensionless
+    score_type = scores.ZScore
+
+    required_capabilities = (ncap.ReceivesSquareCurrent,
+                             ncap.ProducesMembranePotential,
+                             scap.Runnable,
+                             ncap.SupportsSettingTemperature,
+                             ncap.SupportsSettingStopTime)
+
+    required_properties = [
+        "temperature",
+        "ss_delay",
+        "current_duration",
+        "current"
+    ]
+
+    def generate_prediction_nocache(self, model):
+
+        model.set_temperature(self.temperature)
+
+        model.set_stop_time(self.ss_delay + self.current_duration)
+
+        voltage = model.inject_square_current({"delay": self.ss_delay,
+                                               "duration": self.current_duration,
+                                               "amplitude": self.current})
+
+        crossings = get_zero_crossings_neg2pos(voltage, self.ss_delay)
+
+        if plot:
+            plt.plot(voltage.times, voltage)
+            plt.title(str(self))
+            plt.show()
+
+        return len(crossings)
