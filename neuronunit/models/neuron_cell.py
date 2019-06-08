@@ -41,7 +41,7 @@ class NeuronCellModel(sciunit.Model,
     test.judge(model)
     '''
 
-    sampling_period = 0.125 # ms
+    default_sampling_period = 1 # ms
 
     def __init__(self, in_seg, out_seg=None, name=None):
         super(NeuronCellModel, self).__init__()
@@ -56,18 +56,52 @@ class NeuronCellModel(sciunit.Model,
         # Set up current and voltage clamps
         self.injector = self.h.IClamp(self.in_seg)
         self.vclamp = self.h.SEClamp(self.in_seg)
-        self.reset_clamps()
+
+        # Setup recorders and clear clamps
+        self.reset_instruments()
+
+
+    def reset_instruments(self):
+        '''
+        Resets the current and voltage clamps and Vector recorders
+        '''
+
+        # Reset current clamp
+        self.injector.delay = 0
+        self.injector.dur = 0
+        self.injector.amp = 0
+
+        # Reset voltage clamp
+        self.vclamp.amp1, self.vclamp.amp2, self.vclamp.amp3 = [0,0,0]
+        self.vclamp.dur1, self.vclamp.dur2, self.vclamp.dur3 = [0,0,0]
+        self.vclamp.rs = 0.001  # MOhm
+
+        # Reset any changes to sampling period
+        self.setup_recorders(self.default_sampling_period)
+
+    def setup_recorders(self, sampling_period):
+        self.sampling_period = sampling_period
+
+        self.h.steps_per_ms = round(1.0 / self.sampling_period)
+
+        vec_buff_size = 10000*self.h.steps_per_ms
 
         # Set up recorders for simulation time and membrane voltage
         self.tVector = self.h.Vector()
         self.vVector = self.h.Vector()
         self.vciVector = self.h.Vector()
 
+
+        # Allocate 10s worth of recording space - to avoid resizing
+        self.vVector.buffer_size(vec_buff_size)
+        self.tVector.buffer_size(vec_buff_size)
+        self.vciVector.buffer_size(vec_buff_size)
+
         self.vVector.record(self.out_seg._ref_v, self.sampling_period)
         self.tVector.record(self.h._ref_t, self.sampling_period)
         self.vciVector.record(self.vclamp._ref_i, self.sampling_period)
 
-        self.h.steps_per_ms = round(1.0 / self.sampling_period)
+
 
     def get_backend(self):
         return self
@@ -88,12 +122,12 @@ class NeuronCellModel(sciunit.Model,
         self.injector.dur = float(current["duration"])
         self.injector.amp = float(current["amplitude"])
 
+        if "sampling_period" in current:
+            self.setup_recorders(current["sampling_period"])
+
         if not stop_on_spike:
             self.h.run()
         else:
-
-            # import pydevd
-            # pydevd.settrace('192.168.0.100', port=4200)
 
             self.h.stdinit()
             final_stop = self.h.tstop
@@ -112,21 +146,25 @@ class NeuronCellModel(sciunit.Model,
                 aps = get_zero_crossings_neg2pos(voltage, current["delay"])
 
                 if len(aps) > 0:
-                    self.reset_clamps()
+                    self.reset_instruments()
                     return voltage
 
+        voltage = self.get_membrane_potential()
+        self.reset_instruments()
 
-        self.reset_clamps()
-        return self.get_membrane_potential()
+        return voltage
 
     def clamp_voltage(self, voltages=[0*pq.mV, 0*pq.mV, 0*pq.mV], durations=[0]*3*pq.ms):
         self.vclamp.amp1, self.vclamp.amp2, self.vclamp.amp3 = [float(v) for v in voltages]
         self.vclamp.dur1, self.vclamp.dur2, self.vclamp.dur3 = [float(d) for d in durations]
 
         self.h.run()
-        self.reset_clamps()
 
-        return self.nrn_vector_to_AnalogSignal(self.vciVector, pq.nA)
+        current = self.nrn_vector_to_AnalogSignal(self.vciVector, pq.nA)
+
+        self.reset_instruments()
+
+        return current
 
     def get_membrane_potential(self):
         return self.nrn_vector_to_AnalogSignal(self.vVector, pq.mV)
@@ -150,25 +188,12 @@ class NeuronCellModel(sciunit.Model,
         return AnalogSignal(signal, sampling_period=self.sampling_period * pq.ms, units=units)
 
 
-    def reset_clamps(self):
-        '''
-        Sets the current and voltage clamps to have no effect on the simulation
-        '''
-
-        self.injector.delay = 0
-        self.injector.dur = 0
-        self.injector.amp = 0
-
-        # Set up voltage clamp
-        self.vclamp.amp1, self.vclamp.amp2, self.vclamp.amp3 = [0,0,0]
-        self.vclamp.dur1, self.vclamp.dur2, self.vclamp.dur3 = [0,0,0]
-        self.vclamp.rs = 0.001  # MOhm
 
     def __hash__(self):
         hash_tuple = (
             self.name,
             self.h.dt if self.h.cvode_active() == 0 else 0,
-            self.sampling_period,
+            self.default_sampling_period,
             str(self.in_seg),
             str(self.out_seg)
         )

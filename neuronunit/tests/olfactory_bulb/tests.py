@@ -302,10 +302,11 @@ class RheobaseResponseTestHelper(OlfactoryBulbCellSpikeTest):
         # Include a cool-off period to ensure any APs complete
         model.set_stop_time(self.ss_delay + self.current_duration + 100*pq.ms)
 
-        # Inject rheobase
+        # Inject rheobase - sampling at finer rate to capture AP shape better
         voltage = model.inject_square_current({"delay": self.ss_delay,
                                                "duration": self.current_duration,
-                                               "amplitude": rheobase})
+                                               "amplitude": rheobase,
+                                               "sampling_period": 0.125})
 
         if plot:
             plt.plot(voltage)
