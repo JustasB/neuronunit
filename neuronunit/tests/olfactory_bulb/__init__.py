@@ -6,6 +6,8 @@ from abc import abstractmethod
 import publications
 from linetimer import CodeTimer
 
+SHOW_ERRORS = False
+
 class OlfactoryBulbCellTest(VmTest):
 
     @abstractmethod
@@ -29,7 +31,9 @@ class OlfactoryBulbCellTest(VmTest):
             except:
                 import traceback
                 result = traceback.format_exc()
-                print(result)
+
+                if SHOW_ERRORS:
+                    print(result)
 
             # Store result in cache
             self.store_in_cache(model, result)
