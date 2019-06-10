@@ -625,32 +625,62 @@ class AfterHyperpolarizationTimeTest(AfterHyperpolarizationTest):
     ]
 
     def generate_prediction_nocache(self, model):
-        # import pydevd
-        # pydevd.settrace('192.168.0.100', port=4200)
+        _, _, voltage = self.get_dependent_prediction(TargetFreqTestHelper, model)
+        aps = self.get_aps(voltage)
 
-        ap = self.get_dependent_prediction(FirstSpikeTestHelper, model)
+        if len(aps) == 0:
+            return 0 * self.units
 
+        durations = map(self.compute_duration, aps)
+
+        return np.mean(durations) * self.units
+
+    def compute_duration(self, ap):
         if type(ap) == str:
             return 0 * pq.ms
 
+        # Note - using crossing below threshold is prone to under-measuring the AHP
+        # when the APs are very wide. The below code is replaced with measuring from the time of AP peak.
+
         # When the voltage droppes below the threshold voltage
-        crossings = get_zero_crossings_pos2neg(ap["voltage"] - ap["threshold_v"])
-        crossing = crossings[0]
-        crossing_time = ap["voltage"].times[crossing]
+        # crossings = get_zero_crossings_pos2neg(ap["voltage"] - ap["threshold_v"])
+        # crossing = crossings[0]
+        # crossing_time = ap["voltage"].times[crossing]
+
+        # Starting at the time of AP peak
+        crossing_time = ap["voltage"].times[np.argmax(ap["voltage"])]
+
 
         if self.ahp_time_method == 'threshold2min':
+            # Look within 100ms of the AP onset
             roi_v = ap["voltage"].magnitude[np.where(ap["voltage"].times < ap["threshold_t"] + 100*pq.ms)]
+
+            # Find the minimum within the ROI
             i_min_v = np.argmin(roi_v)
+
+            # Get the time of the minimum
             min_v_time = ap["voltage"].times[i_min_v]
+
+            # Compute the duration from AP onset to minimum
             ahp_time = (min_v_time - crossing_time).rescale(pq.ms)
 
         elif self.ahp_time_method == 'threshold2amplitude50%':
+            # Compute the AHP amplitude
             amplitude = self.compute_amplitude(ap)
+
+            # Compute the half amplitude
             amp50 = ap["threshold_v"] - amplitude / 2.0
+
+            # Find where the voltage first crosses below it
             i_amp50 = np.where(ap["voltage"].magnitude[:,0] <= amp50)[0][0]
+
+            # Get the time of the crossing
             t_amp50 = ap["voltage"].times[i_amp50]
 
+            # Compute tye duration from AP onset
             ahp_time = (t_amp50 - crossing_time).rescale(pq.ms)
+
+            # Make sure it's not negative
             ahp_time = max(0*pq.ms, ahp_time)
 
         else:
@@ -979,9 +1009,6 @@ class SpikeAccommodationTimeConstantTest(SpikeTrainTest):
             plt.show()
 
         return tau
-
-
-
 
 
 class SpikesAtCurrentTest(OlfactoryBulbCellTest):
