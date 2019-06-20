@@ -131,6 +131,7 @@ def get_APs(voltage, ss_delay, method):
         first_contiguous = scipy.ndimage.find_objects(features[0])[0]
         v_above_half_amp = ap["voltage"][first_contiguous[0]]
 
+        ap["v_above_half_amp"] = v_above_half_amp
         ap["half_width"] = (v_above_half_amp.t_stop - v_above_half_amp.t_start).rescale(pq.ms)
 
     return aps
@@ -138,7 +139,7 @@ def get_APs(voltage, ss_delay, method):
 
 def extract_threshold_d3dt3(v):
     # Compute the 3rd derivative
-    v3 = np.diff(v.magnitude, n=3, axis=0)[:, 0]
+    v3 = np.diff(v.magnitude, n=3, axis=0)[:, 0] / (v.sampling_period.magnitude ** 3)
     v3 = np.concatenate((v3, [0] * 3))
 
     # Zero-out very small fluctuations
@@ -163,7 +164,7 @@ def extract_threshold_d3dt3(v):
 
 def extract_threshold_dvdt(v, threshold):
     # Compute the 1st derivative
-    v1 = np.diff(v.magnitude, n=1, axis=0)[:, 0]
+    v1 = np.diff(v.magnitude, n=1, axis=0)[:, 0] / v.sampling_period.magnitude
     v1 = np.concatenate((v1, [0]))
 
     # Find the 20mV/ms crossing

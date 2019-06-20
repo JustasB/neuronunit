@@ -75,6 +75,8 @@ class Zibman2011(BasePublication):
 class Stroh2012(BasePublication):
     ''' Stroh et. al. (2012)	NMDA Receptor-Dependent Synaptic Activation of TRPC Channels in Olfactory Bulb Granule Cells '''
     temperature = 21
+    adp_current_duration = 1*pq.ms
+    adp_current_amplitude = 1000*pq.pA
 
 
 class Abraham2010(BasePublication):

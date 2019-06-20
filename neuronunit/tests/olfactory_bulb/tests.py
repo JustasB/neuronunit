@@ -3,7 +3,7 @@ import quantities
 from neuronunit.tests.olfactory_bulb.utilities import get_zero_crossings_neg2pos
 
 debug = False
-plot = False
+plot = True
 
 from ..base import scores
 import quantities as pq
@@ -343,9 +343,6 @@ class FirstSpikeTestHelper(OlfactoryBulbCellSpikeTest):
                              ncap.SupportsSettingStopTime,)
 
     def get_first_ap(self, model):
-        # import pydevd
-        # pydevd.settrace('192.168.0.100', port=4200)
-
         # Get voltage at rheobase
         voltage = self.get_dependent_prediction(RheobaseResponseTestHelper, model)
 
@@ -708,6 +705,112 @@ class AfterHyperpolarizationTimeTest(AfterHyperpolarizationTest):
 
         return ahp_time
 
+
+class AfterDepolarizationResponseHelper(OlfactoryBulbCellSpikeTest):
+
+    required_properties = [
+        "adp_current_duration",
+        "adp_current_amplitude",
+    ]
+
+    def generate_prediction_nocache(self, model):
+        model.set_temperature(self.temperature)
+
+        # Include a cool-off period to ensure any APs complete
+        model.set_stop_time(self.ss_delay + self.adp_current_duration + 100*pq.ms)
+
+        # Inject ADP current - sampling at finer rate to capture AP shape better
+        voltage = model.inject_square_current({"delay": self.ss_delay,
+                                               "duration": self.adp_current_duration,
+                                               "amplitude": self.adp_current_amplitude,
+                                               "sampling_period": 0.125})
+
+        return voltage
+
+class AfterDepolarizationTimeTest(OlfactoryBulbCellSpikeTest):
+    units = pq.ms
+    score_type = scores.ZScore
+    description = "A test of the ADP duration of a cell"
+    name = "ADP duration"
+
+    def generate_prediction_nocache(self, model):
+        resting_v = self.get_dependent_prediction(RestingVoltageTest, model)
+
+        voltage = self.get_dependent_prediction(AfterDepolarizationResponseHelper, model)
+
+        crossings = get_zero_crossings_neg2pos(voltage, self.ss_delay)
+
+        if len(crossings) != 1:
+            raise Exception("Could not compute ADP duration because no APs were detected in the waveform")
+
+        roi = np.where(voltage.times >= self.ss_delay.rescale(pq.ms))
+        times = voltage.times[roi]
+        voltage = voltage.magnitude[roi].flatten()
+
+        max_v_i = np.argmax(voltage)
+        max_v_t = times[max_v_i]
+
+        crossing_t = times[crossings[0]]
+        max_v = voltage[max_v_i] * pq.mV
+        v_half_amp = (max_v - resting_v) / 2.0 + resting_v
+        half_of_v_half = resting_v + (v_half_amp - resting_v) / 2.0
+        half_of_v_half_t = times[np.where((times > crossing_t) & (voltage < half_of_v_half))][0]
+
+        adp_duration = (half_of_v_half_t - crossing_t).rescale(pq.ms)
+
+        if plot:
+            plt.plot(times, voltage)
+            plt.axhline(y=resting_v)
+            plt.axhline(y=v_half_amp)
+            plt.axhline(y=half_of_v_half)
+            plt.axvline(x=half_of_v_half_t)
+            plt.title(str(self) + " " + str(adp_duration))
+            plt.xlim((crossing_t, half_of_v_half_t + 10 * pq.ms))
+            plt.show()
+
+        return adp_duration
+
+class AfterDepolarizationDepthTest(OlfactoryBulbCellSpikeTest):
+    units = pq.mV
+    score_type = scores.ZScore
+    description = "A test of the ADP depth of a cell"
+    name = "ADP depth"
+
+    def generate_prediction_nocache(self, model):
+        '''
+        For a post-AP waveform to be considered an "ADP", the AP should not have an AHP.
+        In other words, the spike forms and then slowly descends back to resting Vm without
+        crossing below the resting Vm (which is what happens with AHP)
+        '''
+
+        resting_v = self.get_dependent_prediction(RestingVoltageTest, model)
+
+        voltage = self.get_dependent_prediction(AfterDepolarizationResponseHelper, model)
+
+        crossings = get_zero_crossings_neg2pos(voltage, self.ss_delay)
+
+        if len(crossings) != 1:
+            raise Exception("Could not compute ADP duration because no APs were detected in the waveform")
+
+        roi = np.where(voltage.times >= self.ss_delay.rescale(pq.ms))
+        times = voltage.times[roi]
+        voltage = voltage.magnitude[roi].flatten()
+
+        min_v = np.min(voltage) * pq.mV
+
+        adp_depth = resting_v - min_v
+
+        if plot:
+            crossing_t = times[crossings[0]]
+
+            plt.plot(times, voltage)
+            plt.axhline(y=resting_v)
+            plt.axhline(y=min_v)
+            plt.title(str(self) + " " + str(adp_depth))
+            plt.xlim((crossing_t, crossing_t + 20 * pq.ms))
+            plt.show()
+
+        return adp_depth
 
 class FISlopeTest(OlfactoryBulbCellSpikeTest):
     units = pq.Hz/pq.nA
