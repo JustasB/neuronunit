@@ -3,7 +3,7 @@ import quantities
 from neuronunit.tests.olfactory_bulb.utilities import get_zero_crossings_neg2pos
 
 debug = False
-plot = True
+plot = False
 
 from ..base import scores
 import quantities as pq
